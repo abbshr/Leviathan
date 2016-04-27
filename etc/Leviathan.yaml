@@ -1,0 +1,44 @@
+# Leviathan Configuration File
+# ============================
+# 注意: 如果不熟悉下面的技术性参数及其配置, 那么请勿修改其默认设置
+#      标记了(manual)的配置项在启动前需要手动修改
+
+version: "0.0.1"
+
+# 本地gossip节点的地址(manual)
+localhost: "127.0.0.1:6000"
+
+hive_fs:
+  rw: true
+  dirname: './run'
+  basename: 'archangel'
+
+leveldb:
+  db_path: './db/lldb.db'
+
+hash_ring:
+  # Hash环虚拟节点数量
+  replica: 20
+
+gossip:
+  alias: "node@non-seed#01"
+  # 种子节点(manual)
+  seeds: ['127.0.0.1:7000']
+  # 本地gossip节点的ip地址(manual)
+  addr: '127.0.0.1'
+  # 本地gossip节点的端口(manual)
+  port: 6000
+  # gossip周期
+  gossip_val: 1000
+  # 心跳维护周期
+  heartbeat_val: 1000
+  # 故障探测/节点健康监测周期
+  health_check_val: 5000
+  # Phi累计故障探测阈值
+  phi_threshold: 6
+  # 累计槽长度
+  val_max_len: 1000
+  # reduce_val: 10000
+
+internal_server:
+  sock: './run/server.sock'

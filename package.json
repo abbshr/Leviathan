@@ -1,0 +1,28 @@
+{
+  "name": "leviathan",
+  "version": "1.0.0",
+  "description": "Distributed storage engine",
+  "main": "index.coffee",
+  "scripts": {
+    "test": "mocha ./",
+    "start": "bin/bootstrap"
+  },
+  "author": "ran <abbshrsoufii@gmail.com>",
+  "license": "MIT",
+  "dependencies": {
+    "cbor": "^1.0.3",
+    "coffee-script": "^1.10.0",
+    "hive-fs": "^1.0.0",
+    "js-yaml": "^3.5.3",
+    "level": "^1.4.0",
+    "leviathan-gossip": "github:abbshr/leviathan-gossip",
+    "leviathan-msgpack-lite": "github:abbshr/leviathan-msgpack-lite",
+    "node-parted": "github:abbshr/parted",
+    "winston": "^2.1.1"
+  },
+  "devDependencies": {
+    "istanbul": "^0.4.2",
+    "mocha": "^2.4.5",
+    "should": "^8.2.2"
+  }
+}
