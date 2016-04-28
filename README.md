@@ -14,14 +14,14 @@ Gossip的节点选择策略借鉴了Cassandra, 以防出现集群岛隔离情景
 数据的分区策略依据一致性哈希算法, 每个节点的ip:port作为参数计算Hash(ip:port)并散列到环上.
 本地持久化引擎使用了具备随机写优势的LevelDB.
 节点的故障探测策略采用了PHI累计故障探测算法, 借鉴了Cassandra对PHI值计算方法的修改.
-~~ 数据更新会实时写入tmpfs文件系统(共享内存区), 允许其他异构系统通过hive-fs获取更新 ~~. 当前异构系统可以通过Feed Stream实时获取更新.
+~~数据更新会实时写入tmpfs文件系统(共享内存区), 允许其他异构系统通过hive-fs获取更新~~. 当前异构系统可以通过Feed Stream实时获取更新.
 采用了CBOR规范作为报文格式化协议.
 
 ### 内部组件
 
 
 + leviathan-gossip: Leviathan的gossip库, 内部实现了PHI累计故障探测模块
-+ ~~ hive-fs: 构建在文件系统之上的块存储系统 ~~
++ ~~hive-fs: 构建在文件系统之上的块存储系统~~
 + parted: Leviathan的一致性哈希实现
 + leveldb: 持久化引擎
 + cbor: 上层通信协议
