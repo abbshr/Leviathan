@@ -5,14 +5,16 @@
   "main": "index.coffee",
   "scripts": {
     "test": "mocha ./",
-    "start": "bin/bootstrap"
+    "start": "bin/build.sh; bin/Leviathan",
+    "build": "bin/build.sh",
+    "develop": "bin/Leviathan"
   },
   "author": "ran <abbshrsoufii@gmail.com>",
   "license": "MIT",
   "dependencies": {
     "cbor": "^1.0.3",
     "coffee-script": "^1.10.0",
-    "hive-fs": "^1.0.0",
+    "hive-fs": "github:abbshr/hive-fs",
     "js-yaml": "^3.5.3",
     "level": "^1.4.0",
     "leviathan-gossip": "github:abbshr/leviathan-gossip",

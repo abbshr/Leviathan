@@ -6,7 +6,7 @@
 version: "0.0.1"
 
 # 本地gossip节点的地址(manual)
-localhost: "127.0.0.1:6000"
+localhost: "127.0.0.1:6002"
 
 hive_fs:
   rw: true
@@ -14,20 +14,20 @@ hive_fs:
   basename: 'archangel'
 
 leveldb:
-  db_path: './persistent/leviathan.lldb'
+  db_path: './persistent/leviathan_2.lldb'
 
 hash_ring:
   # Hash环虚拟节点数量
   replica: 20
 
 gossip:
-  alias: "node@seed#01"
+  alias: "node@non-seed#02"
   # 种子节点(manual)
   seeds: ['127.0.0.1:6000']
   # 本地gossip节点的ip地址(manual)
   addr: '127.0.0.1'
   # 本地gossip节点的端口(manual)
-  port: 6000
+  port: 6002
   # gossip周期
   gossip_val: 1000
   # 心跳维护周期
@@ -41,7 +41,7 @@ gossip:
   # reduce_val: 10000
 
 internal_server:
-  sock: './run/server.sock'
+  sock: './run/server_2.sock'
   
 feed_stream:
-  sock: './run/feed.sock'
+  sock: './run/feed_2.sock'

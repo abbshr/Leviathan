@@ -1,6 +1,6 @@
-#!/usr/local/bin/coffee
+#!/usr/bin/env coffee
 
-# setup extend YAML `require` parser
-require '../lib/util/extend' unless require.extensions.yaml?
 process.chdir "#{__dirname}/.."
-require '..'
+
+Master = require '..'
+Master::fork()

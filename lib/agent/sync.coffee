@@ -1,69 +1,83 @@
 # Synchronize Agent
+# setup extend YAML `require` parser
+require '../util/yaml-extend' unless require.extensions.yaml?
 
 net = require 'net'
 {PassThrough} = require 'stream'
-{log} = require 'util'
 cbor = require 'cbor'
 level = require 'level'
 Ring = require 'node-parted'
-Hive = require 'hive-fs'
 Gossip = require 'leviathan-gossip'
-config = require '../etc/Leviathan'
+FeedStream = require '../feed-stream'
+logger = require('../util/logger')()
 
-hive = new Hive config.hive_fs
+config_path = process.argv[2] ? '../../etc/Leviathan'
+config = require config_path
+
 ring = new Ring config.hash_ring
 gossip = new Gossip config.gossip
 lldb = level config.leveldb.db_path, valueEncoding: 'json'
+internal_server = new net.Server
+feed_stream = new FeedStream config.feed_stream    
 
-bootstrap = (done) ->
+bootstrap = (done = ->) ->
+  process.on 'SIGINT', ->
+
+  process.on "SIGTERM", ->
+    logger.warn "[agent]", "got signal: SIGTERM"
+    internal_server.close ->
+      logger.warn "[agent]", "internal server closed"
+      lldb.close (err) ->
+        logger.warn "[agent]", "leveldb closed"
+        feed_stream.close ->
+          logger.warn "[agent]", "feed stream server closed"
+          logger.warn "[agent]", "process exit"
+          process.exit 0
+  
+  logger.info "[agent]", "process start"
+  feed_stream.open ->
+    logger.info "[agent]", "feed stream server start"
   # 读取leveldb中的数据到进程内存
-  log "[agent booting] - reading data to Hive-fs..."
+  logger.info "[agent]", "retrieving data from leveldb..."
   lldb.createReadStream()
     .on 'data', retrieveExistedData
     .on 'end', done
   
-retrieveExistedData = ({key, value}) ->
+retrieveExistedData = ({key, value: [value, version]}) ->
+  logger.info "[agent]", "get data from leveldb: ", "<#{key}: #{value}>"
   # 写入gossip状态存储
   gossip.set key, value
-  value.idx = key
-  # 写入共享内存
-  hive.write value, (err) ->
-    if err?
-      console.error err
-    else
-      console.info "update:", key
+  feed_stream.push [[key, value, version]]
 
 onBooted = ->
-  log "[agent booting] - hive initializing finished"
-  startInternalServer()
   gossip
   .on 'peers_discover', (new_peers) ->
     for peer in new_peers
-      log "[new peer] - found node# #{peer}"
+      logger.info "[agent]", "found new peers:", peer
       ring.addNode peer
   .on 'peers_recover', (peers) ->
-    ring.addNode peer for peer in peers
+    for peer in peers
+      ring.addNode peer
+      logger.info "[agent]", "peer online:", peer
   .on 'peers_suspend', (peers) ->
-    ring.removeNode peer for peer in peers
+    for peer in peers
+      ring.removeNode peer
+      logger.warn "[agent]", "peer crashed:", peer
   .on 'updates', (deltas) ->
-    for [r, k, v, n] in deltas
-      log "[delta] - get update from peer #{r}: (key: #{k}, value: #{v}) to version #{n}"      
-      lldb.put k, v, (err) ->
+    feeds = for [r, k, v, n] in deltas
+      logger.verbose "[agent]", "get update from peer #{r}: (key: #{k}, value: #{v}) to version #{n}"
+      # if r is config.localhost
+      lldb.put k, [v, n], (err) ->
         if err?
-          log err
+          logger.error err
         else
-          log "[persistent] - delta has been updated to persistent storage"
-      
-      n.idx = k
-      hive.write n, (err) ->
-        if err?
-          log err
-        else
-          log "[shared memory] - delta has been updated to Hive-fs"
-  
+          logger.info "[agent]", "delta has been updated to leveldb"
+      [k, v, n]
+    feed_stream.push feeds
+
   gossip.run ->
-    log "[agent running] - agent start successfully"
-    log "[agent running] - init gossip"
+    logger.info "[agent]", "gossip inited"
+    startInternalServer()
 
 serve = (socket) ->
   rawReqStream = new PassThrough()
@@ -77,17 +91,14 @@ serve = (socket) ->
       switch req_pack.cmd
         when "add_service"
           {serviceName, plugins, upstreams} = req_pack
-          log "[add service] - #{serviceName} => #{upstream}"
+          logger.info "[agent]", "add service: #{serviceName} => #{upstreams}"
           peer_info = ring.search serviceName
           if peer_info is config.localhost
             # 直接写入
             entry = {plugins, upstream}
-            gossip.set serviceName, entry
-            lldb.put serviceName, entry
-            entry.idx = serviceName
-            entry.ts = Date.now()
-            hive.write entry, (err) ->
-              console.error err if err?
+            version = gossip.set serviceName, entry
+            feed_stream.push [[serviceName, entry, version]]
+            lldb.put serviceName, [entry, version]
 
             es.end msg: "accept request"
           else
@@ -95,16 +106,14 @@ serve = (socket) ->
             forward peer_info, {downStream: socket, rawReqStream}
         when "config_plugin"
           {serviceName, pluginName, cfg} = req_pack
+          logger.info "[agent]", "config plugin: #{pluginName} for #{serviceName}"
           key = "#{serviceName}##{pluginName}"
           peer_info = ring.search key
           if peer_info is config.localhost
             # 直接写入
-            gossip.set key, cfg
-            lldb.put key, cfg
-            cfg.idx = key
-            cfg.ts = Date.now()
-            hive.write cfg, (err) ->
-              console.error err if err?
+            version = gossip.set key, cfg
+            feed_stream.push [[key, cfg, version]]
+            lldb.put key, [cfg, version]
 
             es.end msg: "accept request"
           else
@@ -114,13 +123,13 @@ serve = (socket) ->
         # when "query_plugin"
         # when "delete_service"
         # when "uninstall_plugin"
-        else 
+        else
           es.end err: "Rejected: unknown packet"
   
-startInternalServer = ->
-  server = net.createServer serve
-  server.listen config.internal_server.sock, ->
-    log "[agent booting] - internal server started"
+startInternalServer = (done = ->)->
+  internal_server.on 'connection', serve
+  internal_server.listen config.internal_server.sock, ->
+    logger.info "[agent]", "internal server started, listen on", config.internal_server.sock
   
 forward = (peer_info, {rawReqStream, downStream}, callback = ->) ->
   [addr, port] = peer_info.split ':'
@@ -130,7 +139,3 @@ forward = (peer_info, {rawReqStream, downStream}, callback = ->) ->
       .on 'end', callback
   
 bootstrap onBooted
-
-process.on "SIGTERM", ->
-  hive.close()
-  lldb.close()
