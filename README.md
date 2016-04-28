@@ -28,6 +28,12 @@ Gossip的节点选择策略借鉴了Cassandra, 以防出现集群岛隔离情景
 
 ### BootStrap
 
+deploy:
+```bash
+npm run build
+```
+
+run:
 ```bash
 bin/Leviathan [configFile path]
 ```
