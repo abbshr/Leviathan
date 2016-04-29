@@ -1,7 +1,6 @@
 # setup extend YAML `require` parser
-require './lib/util/yaml-extend' unless require.extensions.yaml?
+require './lib/util/yaml-extend'
 
-net = require 'net'
 {fork} = require 'child_process'
 logger = require('./lib/util/logger')()
 

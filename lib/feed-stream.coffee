@@ -19,26 +19,30 @@ class Feed
       client.write raw_pack
     
   onConnection: (socket) =>
-    logger.info "[feed server]", "add a subscribe:", socket.remoteAddress, socket.remotePort
+    logger.info "[feed server]", "add a local subscriber"
     # @createPushStream source, socket
     @clients.add socket
     socket
       # .on 'end', disconnect
-      .on 'close', @clients.delete socket
-      .on 'error', (err) -> logger.error err
+      .on 'close', =>
+        logger.info "[feed server]", "a local client unsubscribe the feeds" 
+        @clients.delete socket
+      .on 'error', (err) => logger.error "[feed server]", err.message
   
   # onClientDisconnect: (socket) ->
   #   => 
     
   onError: (err) =>
-    logger.error "[feed server]", err
+    logger.error "[feed server]", err.message
 
   open: (callback = ->) ->
     @init()
     @server.listen @sock, callback
 
   close: (callback = ->) ->
-    @clients.clear()
     @server.close callback
-    
+    @clients.forEach (client) ->
+      client.end()
+    @clients.clear()
+
 module.exports = Feed

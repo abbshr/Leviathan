@@ -1,6 +1,6 @@
 # Synchronize Agent
 # setup extend YAML `require` parser
-require '../util/yaml-extend' unless require.extensions.yaml?
+require '../util/yaml-extend'
 
 net = require 'net'
 {PassThrough} = require 'stream'
