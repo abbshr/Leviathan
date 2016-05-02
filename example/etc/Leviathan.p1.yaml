@@ -41,7 +41,7 @@ gossip:
   # reduce_val: 10000
 
 internal_server:
-  sock: './run/server_1.sock'
+  sock: ./run/6001.sock
   
 feed_stream:
   sock: './run/feed_1.sock'

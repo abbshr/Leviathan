@@ -41,7 +41,8 @@ gossip:
   # reduce_val: 10000
 
 internal_server:
-  sock: './run/server.sock'
+  port: 8000
+  sock: ./run/6000.sock
   
 feed_stream:
   sock: './run/feed.sock'

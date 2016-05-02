@@ -14,7 +14,7 @@ logger = require('../util/logger')()
 config_path = process.argv[2] ? '../../etc/Leviathan'
 config = require config_path
 
-ring = new Ring config.hash_ring
+ring = new Ring replica: config.hash_ring.replica, nodes: [config.localhost]
 gossip = new Gossip config.gossip
 lldb = level config.leveldb.db_path, valueEncoding: 'json'
 internal_server = new net.Server
@@ -65,7 +65,7 @@ onBooted = ->
       logger.warn "[agent]", "peer crashed:", peer
   .on 'updates', (deltas) ->
     feeds = for [r, k, v, n] in deltas
-      logger.verbose "[agent]", "get update from peer #{r}: (key: #{k}, value: #{v}) to version #{n}"
+      logger.verbose "[agent]", "get update from peer [#{r}]: (key: #{k}, value:", v, ") to version #{n}"
       # if r is config.localhost
       lldb.put k, [v, n], (err) ->
         if err?
@@ -84,43 +84,58 @@ serve = (socket) ->
   ds = new cbor.Decoder()
   es = new cbor.Encoder()
   es.pipe socket
-    .pipe passThrough
+    .pipe rawReqStream
 
   socket.pipe ds
     .once 'data', (req_pack) ->
       switch req_pack.cmd
         when "add_service"
-          {serviceName, plugins, upstreams} = req_pack
-          logger.info "[agent]", "add service: #{serviceName} => #{upstreams}"
-          peer_info = ring.search serviceName
+          {serviceName, plugins = [], upstreams = []} = req_pack
+          peer_info = ring.schedule serviceName
           if peer_info is config.localhost
+            logger.info "[agent]", "add service: #{serviceName}, upstreams: #{upstreams}"
             # 直接写入
-            entry = {plugins, upstream}
+            entry = {plugins, upstreams}
             version = gossip.set serviceName, entry
             feed_stream.push [[serviceName, entry, version]]
             lldb.put serviceName, [entry, version]
 
-            es.end msg: "accept request"
+            es.end msg: "peer <#{config.localhost}> accept request"
           else
             # 转发请求到目标peer
             forward peer_info, {downStream: socket, rawReqStream}
         when "config_plugin"
-          {serviceName, pluginName, cfg} = req_pack
-          logger.info "[agent]", "config plugin: #{pluginName} for #{serviceName}"
+          {serviceName, pluginName, cfg = {}} = req_pack
           key = "#{serviceName}##{pluginName}"
-          peer_info = ring.search key
+          peer_info = ring.schedule key
           if peer_info is config.localhost
+            logger.info "[agent]", "config plugin: #{pluginName} for service: #{serviceName}"
             # 直接写入
             version = gossip.set key, cfg
             feed_stream.push [[key, cfg, version]]
             lldb.put key, [cfg, version]
 
-            es.end msg: "accept request"
+            es.end msg: "peer <#{config.localhost}> accept request"
           else
             # 转发请求到目标peer
             forward peer_info, {downStream: socket, rawReqStream}
-        # when "query_service"
-        # when "query_plugin"
+        when "query_service"
+          {serviceName} = req_pack
+          logger.info "[agent]", "query service: #{serviceName}"
+          lldb.get serviceName, (err, [entry, ...] = []) ->
+            if err?
+              es.end err: err.message
+            else
+              es.end msg: entry
+        when "query_plugin"
+          {serviceName, pluginName} = req_pack
+          logger.info "[agent]", "query plugin: #{serviceName} -> #{pluginName}"
+          key = "#{serviceName}##{pluginName}"
+          lldb.get key, (err, [entry, ...] = []) ->
+            if err?
+              es.end err: err.message
+            else
+              es.end msg: entry
         # when "delete_service"
         # when "uninstall_plugin"
         else
@@ -128,14 +143,18 @@ serve = (socket) ->
   
 startInternalServer = (done = ->)->
   internal_server.on 'connection', serve
-  internal_server.listen config.internal_server.sock, ->
-    logger.info "[agent]", "internal server started, listen on", config.internal_server.sock
+  internal_server.listen config.internal_server.port, ->
+    logger.info "[agent]", "internal server started, listen on", config.internal_server.port
   
 forward = (peer_info, {rawReqStream, downStream}, callback = ->) ->
-  [addr, port] = peer_info.split ':'
-  socket = net.connect peer_info, ->
-    rawReqStream.pipe socket
-      .pipe downStream
-      .on 'end', callback
+  [addr, ...] = peer_info.split ':'
+  port = config.internal_server.port
+  socket = net.connect port, addr
+    .on 'error', (err) ->
+      logger.error "[agent]", err.message
+    .on "connect" ->
+      rawReqStream.pipe socket
+        .pipe downStream
+        .on 'end', callback
   
 bootstrap onBooted
