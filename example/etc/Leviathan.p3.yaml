@@ -8,10 +8,9 @@ version: "0.0.1"
 # 本地gossip节点的地址(manual)
 localhost: "127.0.0.1:6003"
 
-hive_fs:
-  rw: true
+hive:
   dirname: './run'
-  basename: 'archangel'
+  basename: 'archangel_3'
 
 leveldb:
   db_path: './persistent/leviathan_3.lldb'

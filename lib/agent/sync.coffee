@@ -6,6 +6,7 @@ net = require 'net'
 {PassThrough} = require 'stream'
 cbor = require 'cbor'
 level = require 'level'
+{Hive} = require 'hive-fs'
 Ring = require 'node-parted'
 Gossip = require 'leviathan-gossip'
 FeedStream = require '../feed-stream'
@@ -16,7 +17,8 @@ config = require config_path
 
 ring = new Ring replica: config.hash_ring.replica, nodes: [config.localhost]
 gossip = new Gossip config.gossip
-lldb = level config.leveldb.db_path, valueEncoding: 'json'
+# lldb = level config.leveldb.db_path, valueEncoding: 'json'
+hive = new Hive config.hive
 internal_server = new net.Server
 feed_stream = new FeedStream config.feed_stream    
 
@@ -27,8 +29,9 @@ bootstrap = (done = ->) ->
     logger.warn "[agent]", "got signal: SIGTERM"
     internal_server.close ->
       logger.warn "[agent]", "internal server closed"
-      lldb.close (err) ->
-        logger.warn "[agent]", "leveldb closed"
+      # lldb.close (err) ->
+      hive.close (err) ->
+        logger.warn "[agent]", "hivefs closed"
         feed_stream.close ->
           logger.warn "[agent]", "feed stream server closed"
           logger.warn "[agent]", "process exit"
@@ -39,11 +42,12 @@ bootstrap = (done = ->) ->
     logger.info "[agent]", "feed stream server start"
   # 读取leveldb中的数据到进程内存
   logger.info "[agent]", "retrieving data from leveldb..."
-  lldb.createReadStream()
+  # lldb.createReadStream()
+  hive.match()
     .on 'data', retrieveExistedData
     .on 'end', done
   
-retrieveExistedData = ({key, value: [value, version]}) ->
+retrieveExistedData = (key, [value, version]) ->
   logger.info "[agent]", "get data from leveldb: ", "<#{key}: #{value}>"
   # 写入gossip状态存储
   gossip.set key, value
@@ -67,7 +71,8 @@ onBooted = ->
     feeds = for [r, k, v, n] in deltas
       logger.verbose "[agent]", "get update from peer [#{r}]: (key: #{k}, value:", v, ") to version #{n}"
       # if r is config.localhost
-      lldb.put k, [v, n], (err) ->
+      # lldb.put k, [v, n], (err) ->
+      hive.write k, [v, n], (err) ->
         if err?
           logger.error err
         else
@@ -98,7 +103,8 @@ serve = (socket) ->
             entry = {plugins, upstreams}
             version = gossip.set serviceName, entry
             feed_stream.push [[serviceName, entry, version]]
-            lldb.put serviceName, [entry, version]
+            # lldb.put serviceName, [entry, version]
+            hive.write serviceName, [entry, version], ->
 
             es.end msg: "peer <#{config.localhost}> accept request"
           else
@@ -113,7 +119,8 @@ serve = (socket) ->
             # 直接写入
             version = gossip.set key, cfg
             feed_stream.push [[key, cfg, version]]
-            lldb.put key, [cfg, version]
+            # lldb.put key, [cfg, version]
+            hive.write key, [cfg, version], ->
 
             es.end msg: "peer <#{config.localhost}> accept request"
           else
@@ -122,7 +129,8 @@ serve = (socket) ->
         when "query_service"
           {serviceName} = req_pack
           logger.info "[agent]", "query service: #{serviceName}"
-          lldb.get serviceName, (err, [entry, ...] = []) ->
+          # lldb.get serviceName, (err, [entry, ...] = []) ->
+          hive.seek serviceName, (err, [entry, ...] = []) ->
             if err?
               es.end err: err.message
             else
@@ -131,7 +139,8 @@ serve = (socket) ->
           {serviceName, pluginName} = req_pack
           logger.info "[agent]", "query plugin: #{serviceName} -> #{pluginName}"
           key = "#{serviceName}##{pluginName}"
-          lldb.get key, (err, [entry, ...] = []) ->
+          # lldb.get key, (err, [entry, ...] = []) ->
+          hive.seek key, (err, [entry, ...] = []) ->
             if err?
               es.end err: err.message
             else
@@ -143,16 +152,27 @@ serve = (socket) ->
   
 startInternalServer = (done = ->)->
   internal_server.on 'connection', serve
-  internal_server.listen config.internal_server.port, ->
-    logger.info "[agent]", "internal server started, listen on", config.internal_server.port
+  if config.internal_server.sock?
+    internal_server.listen config.internal_server.sock, ->
+      logger.info "[agent]", "internal server started, listen on", config.internal_server.sock
+  else
+    internal_server.listen config.internal_server.port, ->
+      logger.info "[agent]", "internal server started, listen on", config.internal_server.port
   
 forward = (peer_info, {rawReqStream, downStream}, callback = ->) ->
-  [addr, ...] = peer_info.split ':'
+  [addr, sock_port] = peer_info.split ':'
   port = config.internal_server.port
-  socket = net.connect port, addr
+  sock = "./run/#{sock_port}.sock"
+  
+  socket = if config.internal_server.sock?
+    net.connect sock
+  else
+    net.connect port, addr
+  
+  socket
     .on 'error', (err) ->
       logger.error "[agent]", err.message
-    .on "connect" ->
+    .on "connect", ->
       rawReqStream.pipe socket
         .pipe downStream
         .on 'end', callback

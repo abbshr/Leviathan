@@ -8,8 +8,7 @@ version: "0.0.1"
 # 本地gossip节点的地址(manual)
 localhost: "127.0.0.1:6000"
 
-hive_fs:
-  rw: true
+hive:
   dirname: './run'
   basename: 'archangel'
 
