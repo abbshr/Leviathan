@@ -40,15 +40,15 @@ bootstrap = (done = ->) ->
   logger.info "[agent]", "process start"
   feed_stream.open ->
     logger.info "[agent]", "feed stream server start"
-  # 读取leveldb中的数据到进程内存
-  logger.info "[agent]", "retrieving data from leveldb..."
+  # 读取hive-fs中的数据到进程内存
+  logger.info "[agent]", "retrieving data from hive-fs..."
   # lldb.createReadStream()
   hive.match()
     .on 'data', retrieveExistedData
     .on 'end', done
   
 retrieveExistedData = (key, [value, version]) ->
-  logger.info "[agent]", "get data from leveldb: ", "<#{key}: #{value}>"
+  logger.info "[agent]", "get data from hive-fs: ", "<#{key}: #{value}>"
   # 写入gossip状态存储
   gossip.set key, value
   feed_stream.push [[key, value, version]]
@@ -76,7 +76,7 @@ onBooted = ->
         if err?
           logger.error err
         else
-          logger.info "[agent]", "delta has been updated to leveldb"
+          logger.info "[agent]", "delta has been updated to hive-fs"
       [k, v, n]
     feed_stream.push feeds
 

@@ -8,10 +8,9 @@ version: "0.0.1"
 # 本地gossip节点的地址(manual)
 localhost: "127.0.0.1:6004"
 
-hive_fs:
-  rw: true
+hive:
   dirname: './persistent'
-  basename: 'archangel'
+  basename: 'archangel_4'
 
 leveldb:
   db_path: './persistent/leviathan_4.lldb'
@@ -23,7 +22,7 @@ hash_ring:
 gossip:
   alias: "node@non-seed#04"
   # 种子节点(manual)
-  seeds: ['127.0.0.1:6000']
+  seeds: ['127.0.0.1:6000', '127.0.0.1:6001']
   # 本地gossip节点的ip地址(manual)
   addr: '127.0.0.1'
   # 本地gossip节点的端口(manual)
@@ -41,7 +40,7 @@ gossip:
   # reduce_val: 10000
 
 internal_server:
-  sock: './run/server_4.sock'
+  sock: './run/6004.sock'
   
 feed_stream:
   sock: './run/feed_4.sock'

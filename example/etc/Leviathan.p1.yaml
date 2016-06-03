@@ -9,7 +9,7 @@ version: "0.0.1"
 localhost: "127.0.0.1:6001"
 
 hive:
-  dirname: './run'
+  dirname: './persistent'
   basename: 'archangel_1'
 
 leveldb:

@@ -9,7 +9,7 @@ version: "0.0.1"
 localhost: "127.0.0.1:6003"
 
 hive:
-  dirname: './run'
+  dirname: './persistent'
   basename: 'archangel_3'
 
 leveldb:
@@ -22,7 +22,7 @@ hash_ring:
 gossip:
   alias: "node@non-seed#03"
   # 种子节点(manual)
-  seeds: ['127.0.0.1:6000']
+  seeds: ['127.0.0.1:6000', '127.0.0.1:6001']
   # 本地gossip节点的ip地址(manual)
   addr: '127.0.0.1'
   # 本地gossip节点的端口(manual)
@@ -40,7 +40,7 @@ gossip:
   # reduce_val: 10000
 
 internal_server:
-  sock: './run/server_3.sock'
+  sock: './run/6003.sock'
   
 feed_stream:
   sock: './run/feed_3.sock'
