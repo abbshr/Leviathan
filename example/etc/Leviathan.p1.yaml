@@ -22,7 +22,7 @@ hash_ring:
 gossip:
   alias: "node@non-seed#01"
   # 种子节点(manual)
-  seeds: ['127.0.0.1:6000']
+  seeds: ['127.0.0.1:6000', '127.0.0.1:6001']
   # 本地gossip节点的ip地址(manual)
   addr: '127.0.0.1'
   # 本地gossip节点的端口(manual)
